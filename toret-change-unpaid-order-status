@@ -1,0 +1,57 @@
+<?php
+/**
+ * @package   Toret Change unpaid order status
+ * @author    Vladislav Musílek
+ * @license   GPL-2.0+
+ * @link      Toret.cz
+ * @copyright 2016 Toret.cz                             
+ *
+ * @wordpress-plugin
+ * Plugin Name:       Toret Change unpaid order status
+ * Plugin URI:        http://toret.cz/
+ * Description:       Umožňuje změnit status cancelled na jiný, po vypršení časového limitu
+ * Version:           1.0
+ * Author:            Vladislav Musílek
+ * Author URI:        http://toret.cz
+ * Text Domain:       toret-ask-for-product
+ * License:           GPL-2.0+
+ * License URI:       http://www.gnu.org/licenses/gpl-2.0.txt
+ * Domain Path:       /languages
+ */
+
+
+
+remove_action( 'woocommerce_cancel_unpaid_orders', 'wc_cancel_unpaid_orders' );
+add_action( 'woocommerce_cancel_unpaid_orders', '2468_toret_cancel_unpaid_orders' );
+
+function 2468_toret_cancel_unpaid_orders() {
+	global $wpdb;
+
+	$held_duration = get_option( 'woocommerce_hold_stock_minutes' );
+
+	if ( $held_duration < 1 || get_option( 'woocommerce_manage_stock' ) != 'yes' )
+		return;
+
+	$date = date( "Y-m-d H:i:s", strtotime( '-' . absint( $held_duration ) . ' MINUTES', current_time( 'timestamp' ) ) );
+
+	$unpaid_orders = $wpdb->get_col( $wpdb->prepare( "
+		SELECT posts.ID
+		FROM {$wpdb->posts} AS posts
+		WHERE 	posts.post_type   IN ('" . implode( "','", wc_get_order_types() ) . "')
+		AND 	posts.post_status = 'wc-pending'
+		AND 	posts.post_modified < %s
+	", $date ) );
+
+	if ( $unpaid_orders ) {
+		foreach ( $unpaid_orders as $unpaid_order ) {
+			$order = wc_get_order( $unpaid_order );
+
+			if ( apply_filters( 'woocommerce_cancel_unpaid_order', 'checkout' === get_post_meta( $unpaid_order, '_created_via', true ), $order ) ) {
+				$order->update_status( 'on-hold', __( 'Unpaid order st on hold - time limit reached.', 'woocommerce' ) );
+			}
+		}
+	}
+
+	wp_clear_scheduled_hook( 'woocommerce_cancel_unpaid_orders' );
+	wp_schedule_single_event( time() + ( absint( $held_duration ) * 60 ), 'woocommerce_cancel_unpaid_orders' );
+}
