@@ -22,9 +22,9 @@
 
 
 remove_action( 'woocommerce_cancel_unpaid_orders', 'wc_cancel_unpaid_orders' );
-add_action( 'woocommerce_cancel_unpaid_orders', '2468_toret_cancel_unpaid_orders' );
+add_action( 'woocommerce_cancel_unpaid_orders', 't2468_toret_cancel_unpaid_orders' );
 
-function 2468_toret_cancel_unpaid_orders() {
+function t2468_toret_cancel_unpaid_orders() {
 	global $wpdb;
 
 	$held_duration = get_option( 'woocommerce_hold_stock_minutes' );
